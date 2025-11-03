@@ -44,8 +44,13 @@ export function Chatbot() {
   }
 
   function handleQuickReply(reply: string) {
-    setInput(reply)
-    handleSend()
+    const userMessage = { text: reply, sender: 'user' as const }
+    setMessages(prev => [...prev, userMessage])
+
+    setTimeout(() => {
+      const response = getResponse(reply.toLowerCase())
+      setMessages(prev => [...prev, { text: response, sender: 'bot' }])
+    }, 500)
   }
 
   return (
