@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import QRCode from 'qrcode'
 import { getSigner } from '../lib/web3'
+import { Alert } from '../components/Alert'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000'
 
@@ -14,101 +15,237 @@ export function Dashboard() {
   const [qr, setQr] = useState('')
   const [payments, setPayments] = useState<any[]>([])
   const [summary, setSummary] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [copied, setCopied] = useState(false)
+  
   const paymentLink = useMemo(() => `${window.location.origin}/pay/${slug || 'your-slug'}`, [slug])
 
   useEffect(() => {
-    if (slug) QRCode.toDataURL(paymentLink).then(setQr)
+    if (slug && slug !== 'your-slug') {
+      QRCode.toDataURL(paymentLink, { width: 256, margin: 2, color: { dark: '#0a0e27', light: '#ffffff' } }).then(setQr)
+    }
   }, [slug, paymentLink])
 
   async function connectAndSignup() {
-    const signer = await getSigner()
-    const addr = await signer.getAddress()
-    setWallet(addr)
-    const res = await axios.post(`${BACKEND_URL}/api/auth/signup`, { email, walletAddress: addr, name })
-    setToken(res.data.token)
-    // If user already had a slug, load it and hydrate UI
+    setError('')
+    setSuccess('')
+    setLoading(true)
     try {
-      const me = await axios.get(`${BACKEND_URL}/api/users/me`, { headers: { Authorization: `Bearer ${res.data.token}` } })
-      if (me?.data?.user?.slug) {
-        setSlug(me.data.user.slug)
-        const link = `${window.location.origin}/pay/${me.data.user.slug}`
-        QRCode.toDataURL(link).then(setQr)
-        axios.get(`${BACKEND_URL}/api/payments/${me.data.user.slug}`).then(r => setPayments(r.data.payments))
-        axios.get(`${BACKEND_URL}/api/payments/summary/${me.data.user.slug}`).then(r => setSummary(r.data))
-      }
-    } catch {}
+      const signer = await getSigner()
+      const addr = await signer.getAddress()
+      setWallet(addr)
+      const res = await axios.post(`${BACKEND_URL}/api/auth/signup`, { email, walletAddress: addr, name })
+      setToken(res.data.token)
+      setSuccess('✅ Wallet connected successfully!')
+      
+      try {
+        const me = await axios.get(`${BACKEND_URL}/api/users/me`, { headers: { Authorization: `Bearer ${res.data.token}` } })
+        if (me?.data?.user?.slug) {
+          setSlug(me.data.user.slug)
+          const link = `${window.location.origin}/pay/${me.data.user.slug}`
+          QRCode.toDataURL(link, { width: 256, margin: 2 }).then(setQr)
+          loadPaymentData(me.data.user.slug)
+        }
+      } catch {}
+    } catch (e: any) {
+      setError(e?.response?.data?.error || e?.message || 'Failed to connect wallet')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function saveSlug() {
-    await axios.post(`${BACKEND_URL}/api/users/link`, { desiredSlug: slug }, { headers: { Authorization: `Bearer ${token}` } })
-    if (slug) {
-      QRCode.toDataURL(paymentLink).then(setQr)
-      axios.get(`${BACKEND_URL}/api/payments/${slug}`).then(r => setPayments(r.data.payments))
-      axios.get(`${BACKEND_URL}/api/payments/summary/${slug}`).then(r => setSummary(r.data))
+    setError('')
+    setSuccess('')
+    setLoading(true)
+    try {
+      await axios.post(`${BACKEND_URL}/api/users/link`, { desiredSlug: slug }, { headers: { Authorization: `Bearer ${token}` } })
+      setSuccess('✅ Payment link created successfully!')
+      if (slug) {
+        QRCode.toDataURL(paymentLink, { width: 256, margin: 2 }).then(setQr)
+        loadPaymentData(slug)
+      }
+    } catch (e: any) {
+      setError(e?.response?.data?.error || 'Slug already taken or invalid')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function loadPaymentData(userSlug: string) {
+    try {
+      const [paymentsRes, summaryRes] = await Promise.all([
+        axios.get(`${BACKEND_URL}/api/payments/${userSlug}`),
+        axios.get(`${BACKEND_URL}/api/payments/summary/${userSlug}`)
+      ])
+      setPayments(paymentsRes.data.payments)
+      setSummary(summaryRes.data)
+    } catch (e) {
+      console.error('Failed to load payment data:', e)
+    }
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  function formatAmount(wei: string): string {
+    try {
+      const eth = Number(wei) / 1e18
+      return eth > 0.001 ? eth.toFixed(4) : eth.toExponential(2)
+    } catch {
+      return '0'
     }
   }
 
   return (
     <div className="container">
-      <h2 className="title">Dashboard</h2>
-      <div className="row" style={{ alignItems: 'stretch' }}>
-        <div className="col">
-          <div className="glass pad">
-            <h3 className="title">1) Sign up</h3>
-            <input className="input" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
-            <input className="input" placeholder="Name" value={name} onChange={e => setName(e.target.value)} />
-            <button onClick={connectAndSignup} className="btn">Connect Wallet + Sign up</button>
-            {wallet && <>
-              <p className="muted" style={{ marginTop: 8 }}>Connected wallet (prefilled for payments)</p>
-              <input className="input" value={wallet} readOnly />
-            </>}
-          </div>
+      <header style={{ marginBottom: '32px' }}>
+        <div>
+          <h1 className="title" style={{ fontSize: '32px', margin: 0 }}>💳 PayLink Dashboard</h1>
+          <p className="muted" style={{ marginTop: '8px' }}>Manage your payment links and track transactions</p>
         </div>
+      </header>
+
+      {error && <Alert kind="error">{error}</Alert>}
+      {success && <Alert kind="success">{success}</Alert>}
+
+      <div className="row" style={{ alignItems: 'stretch', marginBottom: '24px' }}>
         <div className="col">
-          <div className="glass pad">
-            <h3 className="title">2) Your Payment Link</h3>
-            <input className="input" placeholder="your-slug" value={slug} onChange={e => setSlug(e.target.value)} />
-            <button disabled={!token || !slug} onClick={saveSlug} className="btn">Save Link</button>
-            <p className="muted" style={{ marginTop: 8 }}>Link: {paymentLink}</p>
-            {qr && <img src={qr} width={180} />}
-          </div>
-        </div>
-      </div>
-      <div className="row" style={{ marginTop: 16 }}>
-        <div className="col">
-          <div className="glass pad">
-            <h3 className="title">Recent Payments</h3>
-            {payments.length === 0 ? <p className="muted">No payments yet.</p> : (
-              <div>
-                {payments.slice(0, 8).map((p, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', padding: '8px 0' }}>
-                    <span className="muted">{p.payer?.slice(0,6)}...{p.payer?.slice(-4)}</span>
-                    <span>{Number(p.amount)} wei</span>
-                  </div>
-                ))}
+          <div className="glass pad" style={{ height: '100%' }}>
+            <h3 className="title" style={{ fontSize: '20px' }}>🔐 Connect Your Wallet</h3>
+            <p className="muted" style={{ marginBottom: '16px' }}>Sign up or login with MetaMask to get started</p>
+            <input 
+              className="input" 
+              placeholder="your@email.com" 
+              value={email} 
+              onChange={e => setEmail(e.target.value)} 
+              type="email"
+            />
+            <input 
+              className="input" 
+              placeholder="Your Name" 
+              value={name} 
+              onChange={e => setName(e.target.value)} 
+            />
+            <button onClick={connectAndSignup} className="btn" disabled={loading || !email} style={{ width: '100%' }}>
+              {loading ? <><span className="loading"></span> Connecting...</> : '🦊 Connect Wallet + Sign Up'}
+            </button>
+            {wallet && (
+              <div style={{ marginTop: '16px' }}>
+                <p className="muted" style={{ marginBottom: '8px' }}>Connected Wallet</p>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input className="input" value={wallet} readOnly style={{ flex: 1 }} />
+                  <button onClick={() => copyToClipboard(wallet)} className="copy-btn">
+                    {copied ? '✓' : '📋'}
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
+        
         <div className="col">
-          <div className="glass pad">
-            <h3 className="title">Summary</h3>
-            {summary ? (
-              <div className="muted">
-                <div>Total payments: {summary.totalCount}</div>
-                <div>Total amount (wei): {summary.totalAmount}</div>
-                <div>Last 7d: {summary.last7d.count} tx / {summary.last7d.amount} wei</div>
-                <div>Last 30d: {summary.last30d.count} tx / {summary.last30d.amount} wei</div>
+          <div className="glass pad" style={{ height: '100%' }}>
+            <h3 className="title" style={{ fontSize: '20px' }}>🔗 Your Payment Link</h3>
+            <p className="muted" style={{ marginBottom: '16px' }}>Create a unique slug for your payment page</p>
+            <input 
+              className="input" 
+              placeholder="your-unique-slug" 
+              value={slug} 
+              onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} 
+            />
+            <button 
+              disabled={!token || !slug || loading} 
+              onClick={saveSlug} 
+              className="btn btn-accent" 
+              style={{ width: '100%' }}
+            >
+              {loading ? <><span className="loading"></span> Saving...</> : '💾 Save Payment Link'}
+            </button>
+            {slug && slug !== 'your-slug' && (
+              <div style={{ marginTop: '16px' }}>
+                <p className="muted" style={{ marginBottom: '8px' }}>Your Payment URL</p>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input className="input" value={paymentLink} readOnly style={{ flex: 1, fontSize: '13px' }} />
+                  <button onClick={() => copyToClipboard(paymentLink)} className="copy-btn">
+                    {copied ? '✓' : '📋'}
+                  </button>
+                </div>
+                {qr && (
+                  <div className="qr-container" style={{ marginTop: '16px' }}>
+                    <img src={qr} width={180} alt="QR Code" />
+                  </div>
+                )}
               </div>
-            ) : <p className="muted">No summary yet.</p>}
+            )}
           </div>
         </div>
+      </div>
+
+      {summary && (
+        <div style={{ marginBottom: '24px' }}>
+          <h3 className="title" style={{ fontSize: '24px', marginBottom: '16px' }}>📊 Analytics</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            <div className="stat-card">
+              <div className="stat-value">{summary.totalCount}</div>
+              <div className="stat-label">Total Payments</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{formatAmount(summary.totalAmount.toString())}</div>
+              <div className="stat-label">Total MATIC</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{summary.last7d.count}</div>
+              <div className="stat-label">Last 7 Days</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{summary.last30d.count}</div>
+              <div className="stat-label">Last 30 Days</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="glass pad">
+        <h3 className="title" style={{ fontSize: '24px', marginBottom: '16px' }}>💰 Recent Payments</h3>
+        {payments.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.3 }}>📭</div>
+            <p className="muted">No payments yet. Share your payment link to get started!</p>
+          </div>
+        ) : (
+          <div>
+            {payments.slice(0, 10).map((p, i) => (
+              <div key={i} className="payment-row">
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span className="badge badge-success">✓ Paid</span>
+                    <span className="muted" style={{ fontSize: '13px' }}>
+                      {p.payer?.slice(0, 6)}...{p.payer?.slice(-4)}
+                    </span>
+                  </div>
+                  {p.memo && <p className="muted" style={{ fontSize: '13px' }}>"{p.memo}"</p>}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: '600', fontSize: '16px' }}>
+                    {formatAmount(p.amount)} MATIC
+                  </div>
+                  {p.timestamp && (
+                    <div className="muted" style={{ fontSize: '12px' }}>
+                      {new Date(p.timestamp * 1000).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
 }
-
-const input: React.CSSProperties = { display: 'block', width: '100%', padding: 10, marginBottom: 8, borderRadius: 8, border: '1px solid #ddd' }
-const btn: React.CSSProperties = { padding: '10px 14px', background: '#8247e5', color: '#fff', borderRadius: 8, border: 0 }
-
-
