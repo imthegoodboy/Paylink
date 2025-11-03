@@ -178,6 +178,67 @@ Troubleshooting
 - If transactions fail, check token approvals and MATIC balance for gas
 - Cross-origin errors: confirm VITE_BACKEND_URL and CORS settings
 
+Deployment (Vercel + Render)
+
+1) Backend on Render (Node Web Service)
+
+- Ensure `backend/src/index.ts` listens on `process.env.PORT` (already done).
+- At repo root, the `render.yaml` is provided. On Render:
+  - New → Blueprint → Connect this repo → Deploy.
+  - In the created service, set Environment Variables:
+    - `MONGODB_URI` = your MongoDB connection string
+    - `RPC_URL` = Polygon Amoy RPC (Alchemy/Infura)
+    - `CONTRACT_ADDRESS` = deployed PaymentGateway address
+    - `JWT_SECRET` = any strong random string
+    - (optional) `RECEIPT_NFT_ADDRESS`
+  - Render will build with `npm ci && npm run build` and start with `npm run start` under `backend/`.
+  - After deploy, note the public URL, e.g. `https://paylink-backend.onrender.com`.
+
+2) Frontend on Vercel (Vite React)
+
+- Create a new Vercel project pointing to `frontend/` directory.
+- Set Build Command: `npm run build`, Output Directory: `dist`, Install Command: `npm ci` (or leave auto). `frontend/vercel.json` already matches this.
+- Add Environment Variables in Vercel Project → Settings → Environment Variables:
+  - `VITE_BACKEND_URL` = your Render URL, e.g. `https://paylink-backend.onrender.com`
+  - `VITE_CONTRACT_ADDRESS` = same address used above
+- Trigger a Deploy. After build, open your Vercel URL.
+
+3) Connecting Frontend ↔ Backend
+
+- The frontend reads `VITE_BACKEND_URL` and calls endpoints like `/api/users/by-slug/:slug` and `/api/payments/:slug`.
+- CORS is already enabled server-side (`app.use(cors())`), which allows requests from your Vercel domain.
+- If your backend URL changes, update `VITE_BACKEND_URL` in Vercel and redeploy.
+
+CLI Commands (local verification)
+
+Backend:
+
+```
+cd backend
+npm ci
+npm run build
+npm start
+# or for local dev with watch
+npm run dev
+```
+
+Frontend:
+
+```
+cd frontend
+npm ci
+# create .env.local with Vercel-like vars for local run
+echo VITE_BACKEND_URL=http://localhost:4000 > .env.local
+echo VITE_CONTRACT_ADDRESS=0xYourGatewayOnAmoy >> .env.local
+npm run dev
+npm run build
+```
+
+What to set where
+
+- Render (backend): `MONGODB_URI`, `RPC_URL`, `CONTRACT_ADDRESS`, `JWT_SECRET`
+- Vercel (frontend): `VITE_BACKEND_URL`, `VITE_CONTRACT_ADDRESS`
+
 License
 
 MIT
