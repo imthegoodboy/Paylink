@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
@@ -45,13 +45,13 @@ const paymentSchema = new mongoose.Schema({
 const User = mongoose.model("User", userSchema);
 const Payment = mongoose.model("Payment", paymentSchema);
 
-function auth(req: any, res: any, next: any) {
+function auth(req: Request & { userId?: string }, res: Response, next: NextFunction) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
   if (!token) return res.status(401).json({ error: "Unauthorized" });
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    (req as any).userId = decoded.userId;
+    req.userId = decoded.userId;
     next();
   } catch {
     return res.status(401).json({ error: "Unauthorized" });
@@ -59,7 +59,7 @@ function auth(req: any, res: any, next: any) {
 }
 
 // Routes
-app.post("/api/auth/signup", async (req, res) => {
+app.post("/api/auth/signup", async (req: Request, res: Response) => {
   const { email, walletAddress, name } = req.body || {};
   if (!email || !walletAddress) return res.status(400).json({ error: "email and walletAddress required" });
   const existing = await User.findOne({ email });
@@ -68,12 +68,12 @@ app.post("/api/auth/signup", async (req, res) => {
   res.json({ token, user });
 });
 
-app.get("/api/users/me", auth, async (req: any, res) => {
+app.get("/api/users/me", auth, async (req: Request & { userId?: string }, res: Response) => {
   const user = await User.findById(req.userId);
   res.json({ user });
 });
 
-app.post("/api/users/link", auth, async (req: any, res) => {
+app.post("/api/users/link", auth, async (req: Request & { userId?: string }, res: Response) => {
   const { desiredSlug } = req.body || {};
   if (!desiredSlug) return res.status(400).json({ error: "desiredSlug required" });
   const conflict = await User.findOne({ slug: desiredSlug });
@@ -82,14 +82,14 @@ app.post("/api/users/link", auth, async (req: any, res) => {
   res.json({ user });
 });
 
-app.get("/api/payments/:slug", async (req, res) => {
+app.get("/api/payments/:slug", async (req: Request, res: Response) => {
   const { slug } = req.params;
   const list = await Payment.find({ slug }).sort({ createdAt: -1 }).limit(100);
   res.json({ payments: list });
 });
 
 // Resolve a user's wallet by slug (for payment receiver autofill)
-app.get("/api/users/by-slug/:slug", async (req, res) => {
+app.get("/api/users/by-slug/:slug", async (req: Request, res: Response) => {
   const { slug } = req.params;
   if (!slug) return res.status(400).json({ error: "slug required" });
   const user = await User.findOne({ slug });
@@ -98,7 +98,7 @@ app.get("/api/users/by-slug/:slug", async (req, res) => {
 });
 
 // Payments summary for dashboard analytics
-app.get("/api/payments/summary/:slug", async (req, res) => {
+app.get("/api/payments/summary/:slug", async (req: Request, res: Response) => {
   const { slug } = req.params;
   const now = Date.now();
   const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
@@ -114,7 +114,7 @@ app.get("/api/payments/summary/:slug", async (req, res) => {
 });
 
 // Simple health
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
+app.get("/api/health", (_req: Request, res: Response) => res.json({ ok: true }));
 
 async function main() {
   await mongoose.connect(MONGODB_URI);
