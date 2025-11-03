@@ -4,6 +4,7 @@ import { ethers } from 'ethers'
 import axios from 'axios'
 import { getSigner, getGateway } from '../lib/web3'
 import { Alert } from '../components/Alert'
+import { Navbar } from '../components/Navbar'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000'
 const GATEWAY_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || ''
@@ -112,17 +113,22 @@ export function Pay() {
 
   if (loadingUser) {
     return (
-      <div className="container">
-        <div className="glass pad" style={{ maxWidth: '600px', margin: '64px auto', textAlign: 'center' }}>
-          <span className="loading" style={{ width: '40px', height: '40px', borderWidth: '4px' }}></span>
-          <p className="muted" style={{ marginTop: '16px' }}>Loading payment page...</p>
+      <>
+        <Navbar />
+        <div className="container">
+          <div className="glass pad" style={{ maxWidth: '600px', margin: '64px auto', textAlign: 'center' }}>
+            <span className="loading" style={{ width: '40px', height: '40px', borderWidth: '4px' }}></span>
+            <p className="muted" style={{ marginTop: '16px' }}>Loading payment page...</p>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
   return (
-    <div className="container">
+    <>
+      <Navbar />
+      <div className="container">
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         <div className="glass pad" style={{ marginTop: '32px', marginBottom: '32px' }}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
@@ -257,5 +263,6 @@ export function Pay() {
         )}
       </div>
     </div>
+    </>
   )
 }

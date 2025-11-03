@@ -3,6 +3,8 @@ import axios from 'axios'
 import QRCode from 'qrcode'
 import { getSigner } from '../lib/web3'
 import { Alert } from '../components/Alert'
+import { Navbar } from '../components/Navbar'
+import { generateInvoicePDF } from '../lib/pdfGenerator'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000'
 
@@ -19,8 +21,12 @@ export function Dashboard() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [copied, setCopied] = useState(false)
+  const [paymentCount, setPaymentCount] = useState(0)
+  const [showUpgrade, setShowUpgrade] = useState(false)
   
   const paymentLink = useMemo(() => `${window.location.origin}/pay/${slug || 'your-slug'}`, [slug])
+  const isFreeTrial = paymentCount < 5
+  const remainingFreePayments = Math.max(0, 5 - paymentCount)
 
   useEffect(() => {
     if (slug && slug !== 'your-slug') {
@@ -82,8 +88,31 @@ export function Dashboard() {
       ])
       setPayments(paymentsRes.data.payments)
       setSummary(summaryRes.data)
+      setPaymentCount(paymentsRes.data.payments.length)
+      if (paymentsRes.data.payments.length >= 5) {
+        setShowUpgrade(true)
+      }
     } catch (e) {
       console.error('Failed to load payment data:', e)
+    }
+  }
+
+  function exportToPDF() {
+    if (!slug || payments.length === 0) {
+      setError('No payments to export')
+      return
+    }
+    
+    try {
+      generateInvoicePDF({
+        slug,
+        name,
+        walletAddress: wallet,
+        payments
+      })
+      setSuccess('✅ Invoice PDF downloaded successfully!')
+    } catch (e) {
+      setError('Failed to generate PDF')
     }
   }
 
@@ -103,13 +132,79 @@ export function Dashboard() {
   }
 
   return (
-    <div className="container">
-      <header style={{ marginBottom: '32px' }}>
-        <div>
-          <h1 className="title" style={{ fontSize: '32px', margin: 0 }}>💳 PayLink Dashboard</h1>
-          <p className="muted" style={{ marginTop: '8px' }}>Manage your payment links and track transactions</p>
-        </div>
-      </header>
+    <>
+      <Navbar />
+      <div className="container">
+        {isFreeTrial && slug && (
+          <div style={{
+            padding: '16px 24px',
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 182, 212, 0.1))',
+            border: '1px solid var(--success)',
+            borderRadius: '12px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}>
+            <div>
+              <div style={{ fontWeight: '600', marginBottom: '4px' }}>🎁 Free Trial Active</div>
+              <div className="muted" style={{ fontSize: '14px' }}>
+                {remainingFreePayments} free payments remaining • Upgrade for unlimited access
+              </div>
+            </div>
+            <button className="btn btn-accent" style={{ padding: '10px 20px' }} onClick={() => setShowUpgrade(true)}>
+              Upgrade Now
+            </button>
+          </div>
+        )}
+
+        {showUpgrade && paymentCount >= 5 && (
+          <div className="glass pad" style={{
+            marginBottom: '24px',
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(6, 182, 212, 0.15))',
+            borderColor: 'var(--primary)'
+          }}>
+            <h3 className="title" style={{ fontSize: '20px', marginBottom: '12px' }}>🚀 Upgrade to Premium</h3>
+            <p className="muted" style={{ marginBottom: '16px' }}>
+              You've reached the free trial limit. Upgrade to unlock unlimited payments and premium features!
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px' }}>✓ Unlimited Payments</div>
+                <div className="muted" style={{ fontSize: '12px' }}>No monthly limits</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px' }}>✓ Custom Branding</div>
+                <div className="muted" style={{ fontSize: '12px' }}>Personalize your page</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px' }}>✓ PDF Invoices</div>
+                <div className="muted" style={{ fontSize: '12px' }}>Export anytime</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px' }}>✓ Priority Support</div>
+                <div className="muted" style={{ fontSize: '12px' }}>24/7 assistance</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <button className="btn btn-success" style={{ flex: '1', minWidth: '200px' }}>
+                Upgrade for 0.1 MATIC/month
+              </button>
+              <button className="btn" style={{ flex: '1', minWidth: '200px' }} onClick={() => setShowUpgrade(false)}>
+                Maybe Later
+              </button>
+            </div>
+          </div>
+        )}
+
+        <header style={{ marginBottom: '32px' }}>
+          <div>
+            <h1 className="title" style={{ fontSize: '32px', margin: 0 }}>💳 PayLink Dashboard</h1>
+            <p className="muted" style={{ marginTop: '8px' }}>Manage your payment links and track transactions</p>
+          </div>
+        </header>
 
       {error && <Alert kind="error">{error}</Alert>}
       {success && <Alert kind="success">{success}</Alert>}
@@ -212,7 +307,18 @@ export function Dashboard() {
       )}
 
       <div className="glass pad">
-        <h3 className="title" style={{ fontSize: '24px', marginBottom: '16px' }}>💰 Recent Payments</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+          <h3 className="title" style={{ fontSize: '24px', margin: 0 }}>💰 Recent Payments</h3>
+          {payments.length > 0 && (
+            <button 
+              onClick={exportToPDF}
+              className="btn btn-accent"
+              style={{ padding: '10px 20px', fontSize: '14px' }}
+            >
+              📄 Export PDF Invoice
+            </button>
+          )}
+        </div>
         {payments.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 20px' }}>
             <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.3 }}>📭</div>
@@ -247,5 +353,6 @@ export function Dashboard() {
         )}
       </div>
     </div>
+    </>
   )
 }
