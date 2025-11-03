@@ -23,9 +23,9 @@ Last Updated: November 3, 2025
 /
 ├── frontend/          # React app with Vite
 │   ├── src/
-│   │   ├── pages/     # Landing, Dashboard, Pay pages
-│   │   ├── components/# Alert component
-│   │   ├── lib/       # Web3 utilities
+│   │   ├── pages/     # Landing, Dashboard, Pay, About, HowItWorks
+│   │   ├── components/# Navbar, Alert, Chatbot, SplashScreen
+│   │   ├── lib/       # Web3 utilities, PDF generator
 │   │   └── styles.css # Glass-morphism design system
 │   └── .env          # Frontend environment variables
 ├── backend/          # Express API server
@@ -48,15 +48,24 @@ Last Updated: November 3, 2025
 - **Analytics Dashboard**: Payment statistics and history
 - **QR Code Generation**: For offline/mobile payments
 - **NFT Receipts**: Optional on-chain receipt minting
+- **PDF Invoice Export**: Download professional payment invoices
+- **Interactive Chatbot**: AI-powered support with FAQ quick replies
+- **Free Trial**: 5 payments free before upgrade required
+- **Premium Features**: Custom branding, unlimited payments
 
 ### ✅ UI/UX Enhancements
 - **Modern Glass-morphism Design**: Beautiful water glass effects with gradients
-- **Responsive Layout**: Mobile-friendly design
+- **Responsive Layout**: Mobile-friendly design with hamburger menu
+- **Animated Splash Screen**: Beautiful loading experience on first visit
+- **Navigation Bar**: Consistent navigation across all pages
 - **Loading States**: Visual feedback during async operations
 - **Error Handling**: Clear, user-friendly error messages
 - **Copy-to-Clipboard**: Quick link sharing functionality
 - **Transaction Verification**: PolygonScan integration
 - **Payment History**: Recent transactions with formatting
+- **Polygon Branding**: Network badges and information throughout
+- **Trial Status**: Clear indicators of remaining free payments
+- **Upgrade Prompts**: Premium feature messaging and CTAs
 
 ### ✅ Developer Features
 - **TypeScript**: Full type safety across frontend and backend
@@ -104,6 +113,8 @@ npm run dev
 - Landing Page: `/`
 - Dashboard: `/dashboard`
 - Payment Page: `/pay/:slug`
+- About: `/about`
+- How It Works: `/how-it-works`
 
 ## User Flow
 
@@ -145,6 +156,10 @@ npm run dev
 - **Stat Cards**: Gradient backgrounds for analytics
 - **Form Inputs**: Dark theme with focus states
 - **Alerts**: Icon-based error/success messages
+- **Navbar**: Responsive navigation with mobile menu
+- **Chatbot**: Floating support widget with quick replies
+- **Splash Screen**: Animated loading with gradient effects
+- **Network Badges**: Polygon branding elements
 
 ## Security Considerations
 
@@ -181,26 +196,43 @@ The production build serves both frontend and backend concurrently.
 
 ## Recent Changes (Nov 3, 2025)
 
+### Major Feature Additions
+- **Interactive Chatbot**: AI-powered support with FAQ quick replies for common questions
+- **PDF Invoice Generator**: Export payment history as professional PDF invoices
+- **Payment Limit System**: 5 free payments trial with upgrade prompts
+- **Premium Features**: Custom branding options (paid tier)
+- **About Page**: Mission statement, features showcase, Polygon integration details
+- **How It Works**: Step-by-step guide, FAQs, premium feature information
+- **Splash Screen**: Animated loading experience on first visit
+- **Navigation System**: Responsive navbar with mobile hamburger menu
+
 ### UI Overhaul
 - Completely redesigned with glass-morphism theme
 - Added beautiful gradients and animations
 - Improved typography with Inter font
 - Enhanced mobile responsiveness
+- Polygon network branding throughout
+- Trial status indicators and upgrade CTAs
+- Consistent navigation across all pages
 
-### Feature Additions
+### Feature Enhancements
 - Copy-to-clipboard functionality
 - Loading states for all async operations
 - Better error messages and validation
 - Transaction hash links to PolygonScan
 - Enhanced analytics stat cards
 - Improved QR code presentation
+- PDF export button in dashboard
+- Quick-reply chatbot interactions
 
 ### Technical Improvements
 - Configured for Replit environment
 - Fixed CORS and proxy settings
-- Optimized Vite configuration
+- Optimized Vite configuration (allowed hosts fix)
 - Added proper TypeScript types
 - Improved code organization
+- Installed jsPDF for invoice generation
+- Installed react-icons for UI enhancements
 
 ## Known Issues
 None at this time. All core functionality tested and working.
