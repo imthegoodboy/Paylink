@@ -141,7 +141,7 @@ async function main() {
     }
   });
 
-  app.listen(PORT, "localhost", () => console.log(`API on localhost:${PORT}`));
+  app.listen(PORT, () => console.log(`API listening on port ${PORT}`));
 }
 
 main().catch((e) => {
